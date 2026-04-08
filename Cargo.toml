@@ -1,6 +1,6 @@
 [package]
 name = "paimon"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Paimon - Your sneaky code companion CLI"
 
@@ -10,7 +10,7 @@ path = "src/main.rs"
 
 [dependencies]
 crossterm = "0.27"
-include_dir = "0.7"
+include_dir = { version = "0.7", features = ["glob"] }
 
 [profile.release]
 opt-level = "z"

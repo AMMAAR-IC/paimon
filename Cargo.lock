@@ -50,11 +50,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "glob"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0cc23270f6e1808e30a928bdc84dea0b9b4136a8bc82338574f23baf47bbd280"
+
+[[package]]
 name = "include_dir"
 version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "923d117408f1e49d914f1a379a309cffe4f18c05cf4e3d12e613a15fc81bd0dd"
 dependencies = [
+ "glob",
  "include_dir_macros",
 ]
 
@@ -103,7 +110,7 @@ dependencies = [
 
 [[package]]
 name = "paimon"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "crossterm",
  "include_dir",
