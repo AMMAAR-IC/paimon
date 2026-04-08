@@ -1,1 +1,0 @@
-C:\Users\WIN-ATLAS\Documents\paimon\target\release\paimon.exe: C:\Users\WIN-ATLAS\Documents\paimon\codes\adding.py C:\Users\WIN-ATLAS\Documents\paimon\codes\tests\new.py C:\Users\WIN-ATLAS\Documents\paimon\src\main.rs
