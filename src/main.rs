@@ -25,6 +25,41 @@ impl Entry {
     fn is_dir(&self) -> bool { matches!(self, Entry::Dir{..}) }
 }
 
+// ── Natural sort: compares numeric segments numerically so "2" < "10" ─────────
+fn natural_cmp(a: &str, b: &str) -> std::cmp::Ordering {
+    let mut ai = a.chars().peekable();
+    let mut bi = b.chars().peekable();
+    loop {
+        match (ai.peek(), bi.peek()) {
+            (None, None) => return std::cmp::Ordering::Equal,
+            (None, _)    => return std::cmp::Ordering::Less,
+            (_, None)    => return std::cmp::Ordering::Greater,
+            (Some(ac), Some(bc)) => {
+                let ac_digit = ac.is_ascii_digit();
+                let bc_digit = bc.is_ascii_digit();
+                if ac_digit && bc_digit {
+                    // collect full number from each side
+                    let na: u64 = {
+                        let s: String = ai.by_ref().take_while(|c| c.is_ascii_digit()).collect();
+                        s.parse().unwrap_or(0)
+                    };
+                    let nb: u64 = {
+                        let s: String = bi.by_ref().take_while(|c| c.is_ascii_digit()).collect();
+                        s.parse().unwrap_or(0)
+                    };
+                    let ord = na.cmp(&nb);
+                    if ord != std::cmp::Ordering::Equal { return ord; }
+                } else {
+                    let ac = ai.next().unwrap().to_ascii_lowercase();
+                    let bc = bi.next().unwrap().to_ascii_lowercase();
+                    let ord = ac.cmp(&bc);
+                    if ord != std::cmp::Ordering::Equal { return ord; }
+                }
+            }
+        }
+    }
+}
+
 fn list_entries(dir_path: &str) -> Vec<Entry> {
     let mut out = Vec::new();
     let target = if dir_path.is_empty() {
@@ -42,6 +77,19 @@ fn list_entries(dir_path: &str) -> Vec<Entry> {
         let path = f.path().to_string_lossy().into_owned();
         out.push(Entry::File { name, path });
     }
+
+    // Sort: dirs first (alphabetically), then files in natural order
+    out.sort_by(|a, b| {
+        match (a.is_dir(), b.is_dir()) {
+            (true, false) => std::cmp::Ordering::Less,
+            (false, true) => std::cmp::Ordering::Greater,
+            _             => natural_cmp(a.name(), b.name()),
+        }
+    });
+
+    // after sort, remove duplicate names
+out.dedup_by(|a, b| a.name() == b.name());
+
     out
 }
 
@@ -181,7 +229,7 @@ fn render(app: &App, out: &mut impl Write) -> io::Result<()> {
         }
     }
 
-    // Status
+    // Status bar
     let sr = rows.saturating_sub(2);
     queue!(out, cursor::MoveTo(0, sr))?;
     queue!(out, style::PrintStyledContent(
@@ -216,7 +264,10 @@ fn run_tui() -> io::Result<()> {
         render(&app, &mut stdout)?;
         last_status = None;
 
-        if let Event::Key(KeyEvent { code, .. }) = event::read()? {
+        if let Event::Key(KeyEvent { code, kind, .. }) = event::read()? {
+            // ✅ THIS IS THE FIX — ignore key release and repeat events
+            if kind != event::KeyEventKind::Press { continue; }
+
             match code {
                 KeyCode::Up   | KeyCode::Char('k') => {
                     if app.selected > 0 { app.selected -= 1; }
