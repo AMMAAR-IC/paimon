@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent">
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:padding="16dp">
+
+        <!-- FrameLayout: Image + Offer Tag -->
+        <FrameLayout android:layout_width="match_parent" android:layout_height="200dp">
+            <ImageView android:layout_width="match_parent" android:layout_height="match_parent"
+                android:src="@android:drawable/ic_menu_gallery" android:scaleType="centerCrop"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="20% OFF" android:background="#FF0000" android:textColor="#FFFFFF"
+                android:padding="5dp" android:layout_gravity="top|end"/>
+        </FrameLayout>
+
+        <!-- RelativeLayout: Product Info -->
+        <RelativeLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="10dp">
+            <TextView android:id="@+id/tvProductName"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Smartphone" android:textSize="18sp" android:textStyle="bold"/>
+            <Button android:id="@+id/btnBuy"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="Buy Now" android:layout_alignParentEnd="true"/>
+        </RelativeLayout>
+
+        <!-- TableLayout: Details -->
+        <TableLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:stretchColumns="1" android:layout_marginTop="10dp">
+            <TableRow>
+                <TextView android:text="Price:"/>
+                <TextView android:text="₹20,000"/>
+            </TableRow>
+            <TableRow>
+                <TextView android:text="Quantity:"/>
+                <TextView android:text="1"/>
+            </TableRow>
+        </TableLayout>
+
+    </LinearLayout>
+</ScrollView>

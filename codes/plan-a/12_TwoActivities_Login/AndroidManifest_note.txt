@@ -1,0 +1,2 @@
+Add inside <application> tag in AndroidManifest.xml:
+<activity android:name=".SecondActivity"></activity>
