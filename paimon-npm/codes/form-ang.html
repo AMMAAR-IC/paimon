@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html ng-app="formApp">
+<head>
+    <title>AngularJS Validation Form</title>
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.2/angular.min.js"></script>
+</head>
+<body ng-controller="FormController">
+
+    <div class="form-container">
+        <h2>User Registration</h2>
+        
+        <form name="userForm" ng-submit="submitForm()" novalidate>
+            
+            <label>Full Name:</label>
+            <input type="text" name="fullName" ng-model="user.name" required 
+                   ng-class="{ 'invalid': userForm.fullName.$invalid && userForm.fullName.$touched }">
+            <span class="error" ng-show="userForm.fullName.$touched && userForm.fullName.$error.required">
+                Name is required.
+            </span>
+
+            <label>Email Address:</label>
+            <input type="email" name="email" ng-model="user.email" required
+                   ng-class="{ 'invalid': userForm.email.$invalid && userForm.email.$touched }">
+            <span class="error" ng-show="userForm.email.$touched && userForm.email.$error.required">
+                Email is required.
+            </span>
+            <span class="error" ng-show="userForm.email.$error.email">
+                Invalid email format.
+            </span>
+
+            <label>City:</label>
+            <select name="city" ng-model="user.city" required>
+                <option value="">-- Select City --</option>
+                <option value="Navi Mumbai">New York</option>
+                <option value="Panvel">London</option>
+                <option value="Mumbai">Mumbai</option>
+            </select>
+            <span class="error" ng-show="userForm.city.$touched && userForm.city.$error.required">
+                Please select a city.
+            </span>
+
+            <div style="margin-top: 10px;">
+                <input type="checkbox" name="terms" ng-model="user.terms" required style="width: auto;">
+                <span>I agree to terms</span>
+            </div>
+            <span class="error" ng-show="userForm.terms.$touched && !user.terms">
+                You must accept terms.
+            </span>
+
+            <hr>
+
+            <button type="submit" ng-disabled="userForm.$invalid">Register</button>
+        </form>
+    </div>
+
+    <script>
+        var app = angular.module('formApp', []);
+        app.controller('FormController', function($scope) {
+            $scope.user = {};
+            $scope.submitForm = function() {
+                alert("Form Submitted! Welcome, " + $scope.user.name);
+            };
+        });
+    </script>
+
+</body>
+</html>

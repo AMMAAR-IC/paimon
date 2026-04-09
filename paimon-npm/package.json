@@ -1,0 +1,31 @@
+{
+  "name": "paimon-npm",
+  "version": "0.1.0",
+  "description": "Keyboard-driven CLI to browse and copy code snippets into your working directory",
+  "main": "index.js",
+  "bin": {
+    "paimon-npm": "bin/paimon.js"
+  },
+  "scripts": {
+    "test": "node bin/paimon.js --help"
+  },
+  "keywords": [
+    "cli",
+    "code",
+    "snippets",
+    "boilerplate",
+    "paimon"
+  ],
+  "author": "AMMAAR-IC",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AMMAAR-IC/paimon.git"
+  },
+  "dependencies": {
+    "blessed": "^0.1.81"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
