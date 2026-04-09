@@ -1,6 +1,6 @@
 {
   "name": "paimon-npm",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Keyboard-driven CLI to browse and copy code snippets into your working directory",
   "main": "index.js",
   "bin": {
