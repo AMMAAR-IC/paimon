@@ -6,7 +6,7 @@
     "architecture": {
         "64bit": {
             "url": "https://github.com/AMMAAR-IC/paimon/releases/download/v0.2.0/paimon.exe",
-            "hash": "D14E6A8C7684DD930454E727188B00E5833B025E97F78E42AF25D3144FC0C8F3"
+            "hash": "ccaf889e31ba0851d557182716fa2ea2ded4950fa65e60b1fbebad18e1f55be3"
         }
     },
     "bin": "paimon.exe",
