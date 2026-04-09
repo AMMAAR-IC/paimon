@@ -100,7 +100,7 @@ function runTUI() {
   // ── layout ──
   const header = blessed.box({
     top: 0, left: 0, width: '100%', height: 1,
-    content: ' ✨ PAIMON  v0.1.0',
+    content: ' ✨ PAIMON  v0.2.0',
     style: { fg: '#ffdc64', bg: '#19193d', bold: true },
   });
 
@@ -159,7 +159,7 @@ function runTUI() {
     const total = countAll(CODES_DIR);
     breadcrumb.setContent(breadcrumbText());
     infoBar.setContent(
-      ` ${total} files bundled | ${entries.length} here | ENTER=copy  ←=back  q=quit `
+      ` ${total} files bundled | ${entries.length} here | ENTER=open  c=copy  ←=back  q=quit `
     );
     list.setItems(entries.map(e => ` ${getIcon(e.name, e.isDir)} ${e.name} `));
     list.select(selected);
@@ -169,7 +169,7 @@ function runTUI() {
       statusBar.setContent(` ✦ ${status} `);
     } else {
       statusBar.style.fg = '#5a5a78';
-      statusBar.setContent(' ✦ Use arrow keys to navigate, ENTER to copy to current directory ');
+      statusBar.setContent(' ✦ ↑↓ navigate   ENTER=open folder   c=copy to cwd   ←=back   q=quit ');
     }
     screen.render();
   }
@@ -217,20 +217,37 @@ function runTUI() {
   screen.key(['up', 'k'], () => {
     if (selected > 0) { selected--; render(); }
   });
+
   screen.key(['down', 'j'], () => {
     if (selected < entries.length - 1) { selected++; render(); }
   });
-  screen.key(['left', 'backspace', 'h'], () => { goBack(); });
-  screen.key(['enter', 'l'], () => {
+
+  screen.key(['left', 'backspace', 'h'], () => {
+    goBack();
+  });
+
+  // ENTER — open folder OR copy file
+  screen.key(['enter'], () => {
     if (!entries.length) { status = 'Empty folder.'; statusOk = false; render(); return; }
     const e = entries[selected];
     if (e.isDir) enterDir(e);
     else         copyEntry(e);
   });
-  screen.key(['right', 'c'], () => {
+
+  // C — always copy (file or entire folder) without entering
+  screen.key(['c'], () => {
     if (!entries.length) { status = 'Empty folder.'; statusOk = false; render(); return; }
     copyEntry(entries[selected]);
   });
+
+  // RIGHT arrow — same as enter
+  screen.key(['right'], () => {
+    if (!entries.length) { status = 'Empty folder.'; statusOk = false; render(); return; }
+    const e = entries[selected];
+    if (e.isDir) enterDir(e);
+    else         copyEntry(e);
+  });
+
   screen.key(['q', 'escape', 'C-c'], () => {
     screen.destroy();
     process.exit(0);
@@ -245,13 +262,14 @@ function printHelp() {
   ✨  PAIMON - Your sneaky code companion
 
   USAGE:
-    paimon --code -ls       Open interactive code browser
-    paimon --help           Show this help
+    paimon-npm --code -ls       Open interactive code browser
+    paimon-npm --help           Show this help
 
   CONTROLS:
     ↑ k        Move up
     ↓ j        Move down
-    ENTER →    Select file (copies to cwd) or open folder
+    ENTER →    Open folder / copy file
+    c          Copy file or folder to current directory
     ← Bksp     Go back
     q / ESC    Quit
 
@@ -266,6 +284,6 @@ if (args[0] === '--code' && args[1] === '-ls') {
 } else if (args[0] === '--help' || args[0] === '-h' || args.length === 0) {
   printHelp();
 } else {
-  console.error('Unknown command. Try: paimon --code -ls');
+  console.error('Unknown command. Try: paimon-npm --code -ls');
   process.exit(1);
 }
