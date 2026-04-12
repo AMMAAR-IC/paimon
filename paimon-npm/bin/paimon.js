@@ -2,13 +2,11 @@
 
 'use strict';
 
-const fs = require('fs');
+const fs   = require('fs');
 const path = require('path');
 
 // ── resolve codes dir ────────────────────────────────────────────────────────
 let CODES_DIR = path.join(__dirname, '..', 'codes');
-
-// Fallback to the root /codes directory for local development
 if (!fs.existsSync(CODES_DIR)) {
   CODES_DIR = path.join(__dirname, '..', '..', 'codes');
 }
@@ -27,7 +25,7 @@ function naturalCmp(a, b) {
       if (na !== nb) return na - nb;
     } else {
       if (ca < cb) return -1;
-      if (ca > cb) return 1;
+      if (ca > cb) return  1;
     }
   }
   return 0;
@@ -36,19 +34,19 @@ function naturalCmp(a, b) {
 function listEntries(dirPath) {
   if (!fs.existsSync(dirPath)) return [];
   const items = fs.readdirSync(dirPath);
-  const dirs = [];
+  const dirs  = [];
   const files = [];
   for (const item of items) {
     const full = path.join(dirPath, item);
     const stat = fs.statSync(full);
     if (stat.isDirectory()) dirs.push(item);
-    else files.push(item);
+    else                    files.push(item);
   }
   dirs.sort(naturalCmp);
   files.sort(naturalCmp);
   return [
-    ...dirs.map(n => ({ name: n, full: path.join(dirPath, n), isDir: true })),
-    ...files.map(n => ({ name: n, full: path.join(dirPath, n), isDir: false })),
+    ...dirs.map(n  => ({ name: n, full: path.join(dirPath, n),  isDir: true  })),
+    ...files.map(n => ({ name: n, full: path.join(dirPath, n),  isDir: false })),
   ];
 }
 
@@ -76,7 +74,7 @@ function copyRecursive(src, dest) {
 function getIcon(name, isDir) {
   if (isDir) return '📁';
   const ext = name.split('.').pop().toLowerCase();
-  const map = { java: '☕', c: '🔵', cpp: '🔷', py: '🐍', js: '🟨', ts: '🔷', rs: '🦀', xml: '📋', json: '📦' };
+  const map  = { java:'☕', c:'🔵', cpp:'🔷', py:'🐍', js:'🟨', ts:'🔷', rs:'🦀', xml:'📋', json:'📦' };
   return map[ext] || '📄';
 }
 
@@ -85,7 +83,7 @@ function runTUI() {
   let blessed;
   try { blessed = require('blessed'); }
   catch (e) {
-    console.error('Missing dependency. Run: npm install -g paimon-npm');
+    console.error('Missing dependency. Run: npm install blessed');
     process.exit(1);
   }
 
@@ -97,10 +95,13 @@ function runTUI() {
 
   // ── state ──
   const navStack = [{ dirPath: CODES_DIR, selected: 0 }];
-  let entries = listEntries(CODES_DIR);
+  let allEntries = listEntries(CODES_DIR);
+  let entries  = [...allEntries];
   let selected = 0;
-  let status = '';
+  let status   = '';
   let statusOk = true;
+  let isSearching = false;
+  let searchQuery = '';
 
   // ── layout ──
   const header = blessed.box({
@@ -124,14 +125,26 @@ function runTUI() {
     style: { fg: '#37375a' },
   });
 
+  // 40% left column
   const list = blessed.list({
-    top: 4, left: 0, width: '100%', bottom: 3,
+    top: 4, left: 0, width: '40%', bottom: 3,
     keys: false, mouse: false,
     style: {
-      item: { fg: '#c8c8dc' },
+      item:     { fg: '#c8c8dc' },
       selected: { fg: '#0a0a14', bg: '#ffd750', bold: true },
     },
     scrollbar: { ch: '│', style: { fg: '#5a5a78' } },
+  });
+
+  const verticalDiv = blessed.line({
+    top: 4, left: '40%', width: 1, bottom: 3, orientation: 'vertical',
+    style: { fg: '#37375a' },
+  });
+
+  // 60% right column
+  const previewBox = blessed.box({
+    top: 4, left: '41%', width: '59%', bottom: 3,
+    style: { fg: '#a0a0b4' },
   });
 
   const divBot = blessed.line({
@@ -149,6 +162,8 @@ function runTUI() {
   screen.append(infoBar);
   screen.append(divTop);
   screen.append(list);
+  screen.append(verticalDiv);
+  screen.append(previewBox);
   screen.append(divBot);
   screen.append(statusBar);
 
@@ -160,21 +175,53 @@ function runTUI() {
     }).join(' / ') + ' ';
   }
 
+  function updateFilter() {
+    if (!searchQuery) { entries = allEntries; }
+    else {
+      entries = allEntries.filter(e => e.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    }
+    selected = 0;
+  }
+
+  function renderPreview() {
+    if (!entries.length) { previewBox.setContent(' No files matched.'); return; }
+    const e = entries[selected];
+    if (e.isDir) {
+      previewBox.setContent(' 📁 Directory\n Press ENTER to explore.');
+    } else {
+      try {
+        const content = fs.readFileSync(e.full, 'utf-8');
+        const lines = content.split('\n').slice(0, 40).map(l => ' ' + l).join('\n');
+        previewBox.setContent(lines);
+      } catch (err) {
+        previewBox.setContent(' Binary file or unreadable content.');
+      }
+    }
+  }
+
   function render() {
     const total = countAll(CODES_DIR);
     breadcrumb.setContent(breadcrumbText());
     infoBar.setContent(
-      ` ${total} files bundled | ${entries.length} here | ENTER=open  c=copy  ←=back  q=quit `
+      ` ${total} files bundled | ${entries.length} here | [/] search  ENTER=open  c=copy  ←=back `
     );
     list.setItems(entries.map(e => ` ${getIcon(e.name, e.isDir)} ${e.name} `));
     list.select(selected);
 
-    if (status) {
+    renderPreview();
+
+    if (isSearching) {
+      statusBar.style.fg = '#ffd750';
+      statusBar.setContent(` 🔍 Search: ${searchQuery}_ `);
+      statusBar.style.bold = true;
+    } else if (status) {
       statusBar.style.fg = statusOk ? '#50ff96' : '#ff5050';
+      statusBar.style.bold = true;
       statusBar.setContent(` ✦ ${status} `);
     } else {
       statusBar.style.fg = '#5a5a78';
-      statusBar.setContent(' ✦ ↑↓ navigate   ENTER=open folder   c=copy to cwd   ←=back   q=quit ');
+      statusBar.style.bold = false;
+      statusBar.setContent(' ✦ [/] search   ↑↓ navigate   ENTER=open/copy   c=copy   ←=back ');
     }
     screen.render();
   }
@@ -183,9 +230,11 @@ function runTUI() {
   function enterDir(entry) {
     navStack[navStack.length - 1].selected = selected;
     navStack.push({ dirPath: entry.full, selected: 0 });
-    entries = listEntries(entry.full);
-    selected = 0;
-    status = '';
+    allEntries = listEntries(entry.full);
+    searchQuery = '';
+    isSearching = false;
+    updateFilter();
+    status   = '';
     render();
   }
 
@@ -193,67 +242,88 @@ function runTUI() {
     if (navStack.length <= 1) return;
     navStack.pop();
     const top = navStack[navStack.length - 1];
-    entries = listEntries(top.dirPath);
+    allEntries = listEntries(top.dirPath);
+    searchQuery = '';
+    isSearching = false;
+    updateFilter();
     selected = Math.min(top.selected, Math.max(0, entries.length - 1));
-    status = '';
+    status   = '';
     render();
   }
 
   function copyEntry(entry) {
-    const cwd = process.cwd();
+    const cwd  = process.cwd();
     const dest = path.join(cwd, entry.name);
     try {
       if (entry.isDir) {
         copyRecursive(entry.full, dest);
-        status = `Copied folder ${entry.name} → ${dest}`;
+        status  = `Copied folder ${entry.name} → ${dest}`;
       } else {
         fs.copyFileSync(entry.full, dest);
-        status = `Copied ${entry.name} → ${dest}`;
+        status  = `Copied ${entry.name} → ${dest}`;
       }
       statusOk = true;
     } catch (e) {
-      status = `Error: ${e.message}`;
+      status   = `Error: ${e.message}`;
       statusOk = false;
     }
     render();
   }
 
   // ── keys ──
+  screen.on('keypress', (ch, key) => {
+    if (isSearching) {
+      if (key && (key.name === 'escape' || key.name === 'enter' || key.name === 'return')) {
+        isSearching = false;
+        render();
+      } else if (key && key.name === 'backspace') {
+        searchQuery = searchQuery.slice(0, -1);
+        updateFilter();
+        render();
+      } else if (ch && !key.ctrl && !key.meta && ch.length === 1) {
+        searchQuery += ch;
+        updateFilter();
+        render();
+      }
+    } else {
+      if (ch === '/' || ch === 's') {
+        isSearching = true;
+        render();
+      }
+    }
+  });
+
   screen.key(['up', 'k'], () => {
+    if (isSearching) return;
     if (selected > 0) { selected--; render(); }
   });
 
   screen.key(['down', 'j'], () => {
+    if (isSearching) return;
     if (selected < entries.length - 1) { selected++; render(); }
   });
 
   screen.key(['left', 'backspace', 'h'], () => {
+    if (isSearching) return;
     goBack();
   });
 
-  // ENTER — open folder OR copy file
-  screen.key(['enter'], () => {
+  screen.key(['enter', 'right', 'l'], () => {
+    if (isSearching) return; // handled by keypress
     if (!entries.length) { status = 'Empty folder.'; statusOk = false; render(); return; }
     const e = entries[selected];
     if (e.isDir) enterDir(e);
-    else copyEntry(e);
+    else         copyEntry(e);
   });
 
-  // C — always copy (file or entire folder) without entering
   screen.key(['c'], () => {
+    if (isSearching) return;
     if (!entries.length) { status = 'Empty folder.'; statusOk = false; render(); return; }
     copyEntry(entries[selected]);
   });
 
-  // RIGHT arrow — same as enter
-  screen.key(['right'], () => {
-    if (!entries.length) { status = 'Empty folder.'; statusOk = false; render(); return; }
-    const e = entries[selected];
-    if (e.isDir) enterDir(e);
-    else copyEntry(e);
-  });
-
   screen.key(['q', 'escape', 'C-c'], () => {
+    if (isSearching && key.name === 'escape') return; // handled
     screen.destroy();
     process.exit(0);
   });
@@ -271,10 +341,10 @@ function printHelp() {
     paimon-npm --help           Show this help
 
   CONTROLS:
+    / or s     Search & filter items
     ↑ k        Move up
     ↓ j        Move down
-    ENTER →    Open folder / copy file
-    c          Copy file or folder to current directory
+    ENTER →    Select file (copies to cwd) or open folder
     ← Bksp     Go back
     q / ESC    Quit
 
