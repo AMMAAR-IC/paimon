@@ -175,7 +175,7 @@ fn render(app: &App, out: &mut impl Write) -> io::Result<()> {
     queue!(out, style::PrintStyledContent(blank.clone().on(Color::Rgb{r:25,g:25,b:45})))?;
     queue!(out, cursor::MoveTo(0,0))?;
     queue!(out, style::PrintStyledContent(
-        format!(" \u{2728} PAIMON  v0.1.0 ")
+        format!(" \u{2728} PAIMON  v0.2.0 ")
             .with(Color::Rgb{r:255,g:220,b:100}).on(Color::Rgb{r:25,g:25,b:45}).bold()
     ))?;
 
