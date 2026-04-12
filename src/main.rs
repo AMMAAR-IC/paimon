@@ -25,7 +25,6 @@ impl Entry {
     fn is_dir(&self) -> bool { matches!(self, Entry::Dir{..}) }
 }
 
-// ── Natural sort: compares numeric segments numerically so "2" < "10" ─────────
 fn natural_cmp(a: &str, b: &str) -> std::cmp::Ordering {
     let mut ai = a.chars().peekable();
     let mut bi = b.chars().peekable();
@@ -38,7 +37,6 @@ fn natural_cmp(a: &str, b: &str) -> std::cmp::Ordering {
                 let ac_digit = ac.is_ascii_digit();
                 let bc_digit = bc.is_ascii_digit();
                 if ac_digit && bc_digit {
-                    // collect full number from each side
                     let na: u64 = {
                         let s: String = ai.by_ref().take_while(|c| c.is_ascii_digit()).collect();
                         s.parse().unwrap_or(0)
@@ -78,7 +76,6 @@ fn list_entries(dir_path: &str) -> Vec<Entry> {
         out.push(Entry::File { name, path });
     }
 
-    // Sort: dirs first (alphabetically), then files in natural order
     out.sort_by(|a, b| {
         match (a.is_dir(), b.is_dir()) {
             (true, false) => std::cmp::Ordering::Less,
@@ -87,9 +84,7 @@ fn list_entries(dir_path: &str) -> Vec<Entry> {
         }
     });
 
-    // after sort, remove duplicate names
-out.dedup_by(|a, b| a.name() == b.name());
-
+    out.dedup_by(|a, b| a.name() == b.name());
     out
 }
 
@@ -97,15 +92,13 @@ fn copy_entry_to_cwd(entry: &Entry) -> io::Result<String> {
     let cwd = env::current_dir()?;
     match entry {
         Entry::File { path, name } => {
-            let f = CODES_DIR.get_file(path)
-                .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "not found"))?;
+            let f = CODES_DIR.get_file(path).ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "not found"))?;
             let dest = cwd.join(name);
             fs::write(&dest, f.contents())?;
             Ok(format!("Copied {} -> {}", name, dest.display()))
         }
         Entry::Dir { path, name } => {
-            let d = CODES_DIR.get_dir(path)
-                .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "not found"))?;
+            let d = CODES_DIR.get_dir(path).ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "not found"))?;
             let dest = cwd.join(name);
             copy_dir_recursive(d, &dest)?;
             Ok(format!("Copied folder {} -> {}", name, dest.display()))
@@ -132,18 +125,25 @@ fn count_all(dir: &include_dir::Dir) -> usize {
 
 struct App {
     nav_stack: Vec<(String, usize)>,
+    all_entries: Vec<Entry>,
     entries:   Vec<Entry>,
     selected:  usize,
     status:    Option<(String, bool)>,
+    search_query: String,
+    is_searching: bool,
 }
 
 impl App {
     fn new() -> Self {
+        let all_entries = list_entries("");
         App {
             nav_stack: vec![("".into(), 0)],
-            entries:   list_entries(""),
+            entries: all_entries.clone(),
+            all_entries,
             selected:  0,
             status:    None,
+            search_query: String::new(),
+            is_searching: false,
         }
     }
     fn breadcrumb(&self) -> String {
@@ -154,19 +154,37 @@ impl App {
     fn enter_dir(&mut self, path: String) {
         self.nav_stack.last_mut().unwrap().1 = self.selected;
         self.nav_stack.push((path.clone(), 0));
-        self.entries  = list_entries(&path);
-        self.selected = 0;
+        self.all_entries = list_entries(&path);
+        self.clear_search();
     }
     fn go_back(&mut self) {
         if self.nav_stack.len() > 1 { self.nav_stack.pop(); }
         let (p, s) = self.nav_stack.last().unwrap().clone();
-        self.entries  = list_entries(&p);
+        self.all_entries = list_entries(&p);
+        self.clear_search();
         self.selected = s.min(self.entries.len().saturating_sub(1));
+    }
+    fn clear_search(&mut self) {
+        self.search_query.clear();
+        self.is_searching = false;
+        self.entries = self.all_entries.clone();
+        self.selected = 0;
+    }
+    fn update_filter(&mut self) {
+        let query = self.search_query.to_lowercase();
+        self.entries = self.all_entries.iter()
+            .filter(|e| e.name().to_lowercase().contains(&query))
+            .cloned()
+            .collect();
+        self.selected = 0;
     }
 }
 
 fn render(app: &App, out: &mut impl Write) -> io::Result<()> {
     let (cols, rows) = terminal::size()?;
+    let left_col_width = (cols as f32 * 0.4).floor() as u16;
+    let right_col_width = cols.saturating_sub(left_col_width).saturating_sub(1);
+    
     queue!(out, terminal::Clear(ClearType::All), cursor::MoveTo(0,0))?;
 
     // Header
@@ -190,19 +208,23 @@ fn render(app: &App, out: &mut impl Write) -> io::Result<()> {
     let total = count_all(&CODES_DIR);
     queue!(out, cursor::MoveTo(0,2))?;
     queue!(out, style::PrintStyledContent(
-        format!(" {} files bundled | {} here | ENTER=copy  \u{2190}=back  q=quit ", total, app.entries.len())
+        format!(" {} files bundled | {} here | [/] search  ENTER=open  c=copy  \u{2190}=back  q=quit ", total, app.entries.len())
             .with(Color::Rgb{r:90,g:90,b:120})
     ))?;
 
-    // Divider
+    // Divider Top
     queue!(out, cursor::MoveTo(0,3))?;
     queue!(out, style::PrintStyledContent(
         "\u{2500}".repeat(cols as usize).with(Color::Rgb{r:55,g:55,b:85})
     ))?;
 
-    // List
+    // List & Preview split
     let list_rows = rows.saturating_sub(7) as usize;
     let scroll    = if app.selected >= list_rows { app.selected - list_rows + 1 } else { 0 };
+
+    for i in 4..(4 + list_rows as u16) {
+        queue!(out, cursor::MoveTo(left_col_width, i), style::PrintStyledContent("│".with(Color::Rgb{r:55,g:55,b:85})))?;
+    }
 
     for (i, entry) in app.entries.iter().enumerate().skip(scroll).take(list_rows) {
         let row = 4u16 + (i - scroll) as u16;
@@ -215,10 +237,15 @@ fn render(app: &App, out: &mut impl Write) -> io::Result<()> {
                 "js"   => "🟨", _ => "📄",
             }
         };
-        let label = format!(" {} {} ", icon, entry.name());
+        
+        let mut label = format!(" {} {} ", icon, entry.name());
+        if label.chars().count() > left_col_width as usize {
+            label = label.chars().take(left_col_width as usize - 2).collect::<String>();
+            label.push_str("..");
+        }
 
         if i == app.selected {
-            let padded = format!("{:<width$}", label, width = cols as usize);
+            let padded = format!("{:<width$}", label, width = left_col_width as usize);
             queue!(out, style::PrintStyledContent(
                 padded.with(Color::Rgb{r:10,g:10,b:20}).on(Color::Rgb{r:255,g:215,b:80}).bold()
             ))?;
@@ -229,6 +256,31 @@ fn render(app: &App, out: &mut impl Write) -> io::Result<()> {
         }
     }
 
+    // Render Preview
+    if let Some(entry) = app.entries.get(app.selected) {
+        if entry.is_dir() {
+            queue!(out, cursor::MoveTo(left_col_width + 2, 5))?;
+            queue!(out, style::PrintStyledContent("📁 Directory (Press ENTER to explore)".with(Color::Rgb{r:100,g:100,b:120})))?;
+        } else if let Entry::File { path, .. } = entry {
+            if let Some(file) = CODES_DIR.get_file(path) {
+                if let Some(content) = file.contents_utf8() {
+                    for (j, line) in content.lines().take(list_rows).enumerate() {
+                        let mut trunc_line = line.to_string();
+                        if trunc_line.chars().count() > right_col_width as usize {
+                            trunc_line = trunc_line.chars().take(right_col_width as usize - 3).collect();
+                            trunc_line.push_str("...");
+                        }
+                        queue!(out, cursor::MoveTo(left_col_width + 2, 4 + j as u16))?;
+                        queue!(out, style::PrintStyledContent(trunc_line.with(Color::Rgb{r:160,g:160,b:180})))?;
+                    }
+                } else {
+                    queue!(out, cursor::MoveTo(left_col_width + 2, 5))?;
+                    queue!(out, style::PrintStyledContent("Binary file or unreadable content.".with(Color::Rgb{r:100,g:100,b:120})))?;
+                }
+            }
+        }
+    }
+
     // Status bar
     let sr = rows.saturating_sub(2);
     queue!(out, cursor::MoveTo(0, sr))?;
@@ -236,16 +288,23 @@ fn render(app: &App, out: &mut impl Write) -> io::Result<()> {
         "\u{2500}".repeat(cols as usize).with(Color::Rgb{r:55,g:55,b:85})
     ))?;
     queue!(out, cursor::MoveTo(0, sr+1))?;
-    match &app.status {
-        Some((msg, is_err)) => {
-            let col = if *is_err { Color::Rgb{r:255,g:80,b:80} } else { Color::Rgb{r:80,g:255,b:150} };
-            queue!(out, style::PrintStyledContent(format!(" \u{2726} {} ", msg).with(col).bold()))?;
-        }
-        None => {
-            queue!(out, style::PrintStyledContent(
-                " \u{2726} Use arrow keys to navigate, ENTER to copy to current directory "
-                    .with(Color::Rgb{r:90,g:90,b:120})
-            ))?;
+    
+    if app.is_searching {
+        queue!(out, style::PrintStyledContent(
+            format!(" \u{1F50D} Search: {}_ ", app.search_query).with(Color::Rgb{r:255,g:215,b:80}).bold()
+        ))?;
+    } else {
+        match &app.status {
+            Some((msg, is_err)) => {
+                let col = if *is_err { Color::Rgb{r:255,g:80,b:80} } else { Color::Rgb{r:80,g:255,b:150} };
+                queue!(out, style::PrintStyledContent(format!(" \u{2726} {} ", msg).with(col).bold()))?;
+            }
+            None => {
+                queue!(out, style::PrintStyledContent(
+                    " \u{2726} [/] to search. Use arrow keys to navigate, ENTER to copy/open "
+                        .with(Color::Rgb{r:90,g:90,b:120})
+                ))?;
+            }
         }
     }
     out.flush()
@@ -265,22 +324,31 @@ fn run_tui() -> io::Result<()> {
         last_status = None;
 
         if let Event::Key(KeyEvent { code, kind, .. }) = event::read()? {
-            // ✅ THIS IS THE FIX — ignore key release and repeat events
             if kind != event::KeyEventKind::Press { continue; }
 
             match code {
-                KeyCode::Up   | KeyCode::Char('k') => {
-                    if app.selected > 0 { app.selected -= 1; }
+                KeyCode::Esc => {
+                    if app.is_searching {
+                        app.is_searching = false;
+                    } else {
+                        break;
+                    }
                 }
-                KeyCode::Down | KeyCode::Char('j') => {
-                    if app.selected + 1 < app.entries.len() { app.selected += 1; }
+                KeyCode::Backspace => {
+                    if app.is_searching {
+                        app.search_query.pop();
+                        app.update_filter();
+                    } else {
+                        app.go_back();
+                    }
                 }
-                KeyCode::Left | KeyCode::Backspace | KeyCode::Char('h') => {
-                    app.go_back();
-                }
-                KeyCode::Enter | KeyCode::Char('l') => {
+                KeyCode::Enter => {
+                    if app.is_searching {
+                        app.is_searching = false;
+                        continue;
+                    }
                     if app.entries.is_empty() {
-                        last_status = Some(("Empty folder.".into(), true));
+                        last_status = Some(("Empty folder or no match.".into(), true));
                         continue;
                     }
                     let entry = app.entries[app.selected].clone();
@@ -293,18 +361,57 @@ fn run_tui() -> io::Result<()> {
                         }
                     }
                 }
-                KeyCode::Right | KeyCode::Char('c') => {
-                    if app.entries.is_empty() {
-                        last_status = Some(("Empty folder.".into(), true));
-                        continue;
-                    }
-                    let entry = app.entries[app.selected].clone();
-                    match copy_entry_to_cwd(&entry) {
-                        Ok(msg)  => last_status = Some((msg, false)),
-                        Err(e)   => last_status = Some((format!("Error: {}", e), true)),
+                KeyCode::Up => { if app.selected > 0 { app.selected -= 1; } }
+                KeyCode::Down => { if app.selected + 1 < app.entries.len() { app.selected += 1; } }
+                KeyCode::Left => { if !app.is_searching { app.go_back(); } }
+                KeyCode::Right => {
+                    if !app.is_searching {
+                        if app.entries.is_empty() {
+                            last_status = Some(("Empty folder.".into(), true));
+                            continue;
+                        }
+                        let entry = app.entries[app.selected].clone();
+                        match copy_entry_to_cwd(&entry) {
+                            Ok(msg)  => last_status = Some((msg, false)),
+                            Err(e)   => last_status = Some((format!("Error: {}", e), true)),
+                        }
                     }
                 }
-                KeyCode::Char('q') | KeyCode::Esc => break,
+                KeyCode::Char(c) => {
+                    if app.is_searching {
+                        app.search_query.push(c);
+                        app.update_filter();
+                    } else {
+                        match c {
+                            'k' => if app.selected > 0 { app.selected -= 1; },
+                            'j' => if app.selected + 1 < app.entries.len() { app.selected += 1; },
+                            'h' => app.go_back(),
+                            'l' => {
+                                if !app.entries.is_empty() {
+                                    let entry = app.entries[app.selected].clone();
+                                    if entry.is_dir() { app.enter_dir(entry.path().to_string()); }
+                                    else {
+                                        match copy_entry_to_cwd(&entry) {
+                                            Ok(msg)  => last_status = Some((msg, false)),
+                                            Err(e)   => last_status = Some((format!("Error: {}", e), true)),
+                                        }
+                                    }
+                                }
+                            },
+                            'c' => {
+                                if !app.entries.is_empty() {
+                                    match copy_entry_to_cwd(&app.entries[app.selected].clone()) {
+                                        Ok(msg)  => last_status = Some((msg, false)),
+                                        Err(e)   => last_status = Some((format!("Error: {}", e), true)),
+                                    }
+                                }
+                            },
+                            '/' | 's' => { app.is_searching = true; },
+                            'q' => break,
+                            _ => {}
+                        }
+                    }
+                }
                 _ => {}
             }
         }
@@ -321,10 +428,11 @@ fn print_help() {
     println!("    paimon --code -ls       Open interactive code browser");
     println!("    paimon --help           Show this help\n");
     println!("  CONTROLS:");
-    println!("    \u{2191} k        Move up");
-    println!("    \u{2193} j        Move down");
-    println!("    ENTER \u{2192}   Select file (copies to cwd) or open folder");
-    println!("    \u{2190} Bksp    Go back");
+    println!("    / or s    Search & filter items");
+    println!("    \u{2191} k       Move up");
+    println!("    \u{2193} j       Move down");
+    println!("    ENTER \u{2192}  Select file (copies to cwd) or open folder");
+    println!("    \u{2190} Bksp   Go back");
     println!("    q / ESC   Quit\n");
     println!("  Files are copied to wherever you ran paimon from.\n");
 }
