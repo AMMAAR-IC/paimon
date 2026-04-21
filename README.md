@@ -11,7 +11,7 @@ winget install Ammaar.Paimon
 
 ### Using Scoop
 ```powershell
-scoop install https://raw.githubusercontent.com/AMMAAR-IC/paimon/main/paimon.json
+scoop install https://raw.githubusercontent.com/AmmaarBakshi/paimon/main/paimon.json
 ```
 
 ### Using NPM

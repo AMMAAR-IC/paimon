@@ -51,7 +51,7 @@ Paimon embeds files into the binary at compile-time. To add your own:
 ### Setup
 ```bash
 # Clone your fork
-git clone https://github.com/YOUR_USERNAME/paimon.git
+git clone https://github.com/AmmaarBakshi/paimon.git
 cd paimon
 
 # Build and run
