@@ -25,7 +25,8 @@
     "url": "git+https://github.com/AMMAAR-IC/paimon.git"
   },
   "dependencies": {
-    "blessed": "^0.1.81"
+    "blessed": "^0.1.81",
+    "cli-highlight": "^2.1.11"
   },
   "engines": {
     "node": ">=14.0.0"

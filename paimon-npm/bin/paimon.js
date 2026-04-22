@@ -190,7 +190,12 @@ function runTUI() {
       previewBox.setContent(' 📁 Directory\n Press ENTER to explore.');
     } else {
       try {
-        const content = fs.readFileSync(e.full, 'utf-8');
+        let content = fs.readFileSync(e.full, 'utf-8');
+        try {
+          const highlight = require('cli-highlight').highlight;
+          const ext = e.name.split('.').pop()?.toLowerCase();
+          content = highlight(content, { language: ext, ignoreIllegals: true });
+        } catch (highlightErr) {}
         const lines = content.split('\n').slice(0, 40).map(l => ' ' + l).join('\n');
         previewBox.setContent(lines);
       } catch (err) {
