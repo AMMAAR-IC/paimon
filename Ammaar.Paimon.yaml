@@ -1,5 +1,5 @@
 PackageIdentifier: Ammaar.Paimon
-PackageVersion: 0.2.0
+PackageVersion: 1.5.0
 PackageName: Paimon
 Publisher: Ammaar
 ShortDescription: "Your sneaky code companion CLI"
@@ -7,8 +7,8 @@ License: MIT
 InstallerType: portable
 Installers:
   - Architecture: x64
-    InstallerUrl: https://github.com/AMMAAR-IC/paimon/releases/download/v0.2.0/paimon.exe
-    InstallerSha256: ccaf889e31ba0851d557182716fa2ea2ded4950fa65e60b1fbebad18e1f55be3
+    InstallerUrl: https://github.com/AMMAAR-IC/paimon/releases/download/v1.5.0/paimon.exe
+    InstallerSha256: e07e7df0b49c18a33698344ebe796d4b0338a4e176d2bfcc0c53eebd48bb4cd0
     Commands:
       - paimon
 ManifestType: singleton

@@ -1,12 +1,12 @@
 {
-    "version": "0.2.0",
+    "version": "1.5.0",
     "description": "Keyboard-driven CLI to inject code snippets into your working directory",
     "homepage": "https://github.com/AmmaarBakshi/paimon",
     "license": "MIT",
     "architecture": {
         "64bit": {
-            "url": "https://github.com/AmmaarBakshi/paimon/releases/download/v0.2.0/paimon.exe",
-            "hash": "ccaf889e31ba0851d557182716fa2ea2ded4950fa65e60b1fbebad18e1f55be3"
+            "url": "https://github.com/AmmaarBakshi/paimon/releases/download/v1.5.0/paimon.exe",
+            "hash": "e07e7df0b49c18a33698344ebe796d4b0338a4e176d2bfcc0c53eebd48bb4cd0"
         }
     },
     "bin": "paimon.exe",
